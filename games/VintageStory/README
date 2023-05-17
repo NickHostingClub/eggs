@@ -1,0 +1,5 @@
+In the directory of the Dockerfile. 
+
+docker build -t pterodactyl-mono:latest .
+
+The pterodactyl-scripts:latest is a alpine:3.18 docker container, with a few tools installed like curl, wget, git, jq, etc.
