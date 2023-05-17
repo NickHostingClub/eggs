@@ -1,6 +1,6 @@
 FROM mono:latest
 
-LABEL       author="NickChillClub" maintainer="pterodactyl@nickhosting.club"
+LABEL       author="NickChillClub" maintainer="eggs@nickhosting.club"
 
 
 WORKDIR /home/container
