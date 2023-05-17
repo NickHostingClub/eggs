@@ -5,11 +5,11 @@ set -x
 curl -O https://curl.se/ca/cacert.pem
 
 # Kies de juiste URL op basis van de release branch
-if [ "$RELEASE_BRANCH" = "stable" ]; then
+if [ "${RELEASE_BRANCH}" = "stable" ]; then
     URL="https://api.vintagestory.at/stable.json"
-elif [ "$RELEASE_BRANCH" = "unstable" ]; then
+elif [ ${RELEASE_BRANCH} = "unstable" ]; then
     URL="https://api.vintagestory.at/unstable.json"
-elif [ "$RELEASE_BRANCH" = "pre" ]; then
+elif [ ${RELEASE_BRANCH} = "pre" ]; then
     URL="https://api.vintagestory.at/pre.json"
 else
     echo -e "Ongeldige release branch"
@@ -27,9 +27,14 @@ if [ $? -ne 0 ]; then
 fi
 
 # Als de release version "latest" is, krijg de laatste versie nummer
-if [ "$RELEASE_VERSION" = "latest" ]; then
-    LATEST_KEY=$(echo -e "$JSON_DATA" | jq -r 'keys[] as $k | select(."$k".latest == 1) | $k')
-    RELEASE_VERSION=${LATEST_KEY:-$(echo -e "$JSON_DATA" | jq -r 'keys[0]')}
+if [ "${RELEASE_VERSION}" = "latest" ]; then
+    LATEST_KEY=$(echo -e "$JSON_DATA" | jq -r 'to_entries[] | select(any(.value[]; .latest == 1)) | .key')
+    if [ -z "$LATEST_KEY" ]; then
+        echo -e "Laatste versie niet gevonden"
+        exit 1
+    else
+        RELEASE_VERSION=$LATEST_KEY
+    fi
 fi
 
 # Zoek de CDN en de lokale URL van de te downloaden bestanden
@@ -61,8 +66,10 @@ else
     FILE_URL=$CDN_URL
 fi
 
+cd /mnt/server
+
 # Verwijder oude data, behalve de data map
-#find . -maxdepth 1 ! -name 'data' ! -name '.' -exec rm -rf {} +
+find . -maxdepth 1 ! -name 'data' ! -name '.' -exec rm -rf {} +
 
 # Controleer of data map bestaat, zo niet, maak het aan
 if [ ! -d "data" ]; then
