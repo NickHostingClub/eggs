@@ -1,0 +1,42 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2023-05-17T04:30:21+02:00",
+    "name": "Server",
+    "author": "info@nickhosting.club",
+    "description": null,
+    "features": null,
+    "docker_images": {
+        "pterodactyl-mono:latest": "pterodactyl-mono:latest"
+    },
+    "file_denylist": [],
+    "startup": "mono VintagestoryServer.exe --dataPath data",
+    "config": {
+        "files": "{\r\n    \".\/data\/serverconfig.json\": {\r\n        \"parser\": \"json\",\r\n        \"find\": {\r\n            \"Port\": \"{{server.build.default.port}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \"Dedicated Server now running \"\r\n}",
+        "logs": "{}",
+        "stop": "\/stop"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!\/bin\/ash\r\nset -e\r\n\r\nURL=\"https:\/\/cdn.vintagestory.at\/gamefiles\/stable\/vs_server_${VINTAGE_STORY_VERSION}.tar.gz\"\r\n\r\nHTTP_CODE=$(curl -s -o \/dev\/null -w \"%{http_code}\" $URL || exit 1)\r\n\r\nif [ $HTTP_CODE -eq 200 ]; then\r\n    echo -e \"Version number is valid for version ${VINTAGE_STORY_VERSION}. Continuing installation\"\r\nelse\r\n    echo -e \"Version is not valid for version ${VINTAGE_STORY_VERSION}.\"\r\n    exit 1\r\nfi\r\n\r\ncd \/mnt\/server\r\n\r\n# Remove all old files except for 'data' directory\r\nfind . -maxdepth 1 ! -name 'data' ! -name '.' -exec rm -rf {} +\r\n\r\necho -e \"Downloading version ${URL}\"\r\n\r\ncurl -sSl ${URL} | tar xz\r\n\r\nif [ ! -d \"data\" ]; then\r\n  mkdir data\r\nfi\r\n\r\nif [ ! -f data\/serverconfig.json ]; then\r\n    echo -e \"Downloading Vintage Story serverconfig.json\"\r\n    curl -o data\/serverconfig.json https:\/\/raw.githubusercontent.com\/NickHostingClub\/eggs\/main\/games\/VintageStory\/serverconfig.json\r\nfi",
+            "container": "pterodactyl-scripts:latest",
+            "entrypoint": "ash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Vintage Story Version",
+            "description": "Get the newest \"vs_server_*.*.*.tar.gz\" package (Tar.gz Archive\/Linux (server only) under Show other available downloads of Vintage Story)",
+            "env_variable": "VINTAGE_STORY_VERSION",
+            "default_value": "1.18.3",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|regex:\/^[0-9]+(\\.[0-9]+){2}$\/",
+            "field_type": "text"
+        }
+    ]
+}
