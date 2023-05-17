@@ -1,5 +1,6 @@
 #!/bin/sh
 set -x
+cd /mnt/server
 
 # Download de CA-bundel van Mozilla
 curl -O https://curl.se/ca/cacert.pem
@@ -66,11 +67,6 @@ else
     FILE_URL=$CDN_URL
 fi
 
-cd /mnt/server
-
-# Verwijder oude data, behalve de data map
-find . -maxdepth 1 ! -name 'data' ! -name '.' -exec rm -rf {} +
-
 # Controleer of data map bestaat, zo niet, maak het aan
 if [ ! -d "data" ]; then
   mkdir data
@@ -98,3 +94,4 @@ tar xz -f "vs_server.tar.gz"
 
 # Verwijder het gedownloade bestand
 rm "vs_server.tar.gz"
+rm "cacert.pem"
