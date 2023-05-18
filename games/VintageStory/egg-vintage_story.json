@@ -4,10 +4,10 @@
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2023-05-17T04:30:21+02:00",
+    "exported_at": "2023-05-18T02:18:18+02:00",
     "name": "Server",
-    "author": "eggs@nickhosting.club",
-    "description": null,
+    "author": "info@nickhosting.club",
+    "description": "Vintage Story is an uncompromising wilderness survival sandbox game inspired by eldritch horror themes. Find yourself in a ruined world reclaimed by nature and permeated by unnerving temporal disturbances. Relive the advent of human civilization, or take your own path.",
     "features": null,
     "docker_images": {
         "pterodactyl-mono:latest": "pterodactyl-mono:latest"
@@ -22,20 +22,30 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!\/bin\/ash\r\nset -e\r\n\r\nURL=\"https:\/\/cdn.vintagestory.at\/gamefiles\/stable\/vs_server_${VINTAGE_STORY_VERSION}.tar.gz\"\r\n\r\nHTTP_CODE=$(curl -s -o \/dev\/null -w \"%{http_code}\" $URL || exit 1)\r\n\r\nif [ $HTTP_CODE -eq 200 ]; then\r\n    echo -e \"Version number is valid for version ${VINTAGE_STORY_VERSION}. Continuing installation\"\r\nelse\r\n    echo -e \"Version is not valid for version ${VINTAGE_STORY_VERSION}.\"\r\n    exit 1\r\nfi\r\n\r\ncd \/mnt\/server\r\n\r\n# Remove all old files except for 'data' directory\r\nfind . -maxdepth 1 ! -name 'data' ! -name '.' -exec rm -rf {} +\r\n\r\necho -e \"Downloading version ${URL}\"\r\n\r\ncurl -sSl ${URL} | tar xz\r\n\r\nif [ ! -d \"data\" ]; then\r\n  mkdir data\r\nfi\r\n\r\nif [ ! -f data\/serverconfig.json ]; then\r\n    echo -e \"Downloading Vintage Story serverconfig.json\"\r\n    curl -o data\/serverconfig.json https:\/\/raw.githubusercontent.com\/NickHostingClub\/eggs\/main\/games\/VintageStory\/serverconfig.json\r\nfi",
+            "script": "#!\/bin\/sh\r\nset -x\r\ncd \/mnt\/server\r\n\r\n# Download the CA bundle from Mozilla.\r\ncurl -O https:\/\/curl.se\/ca\/cacert.pem\r\n\r\n# Select the appropriate URL based on the release branch.\r\nif [ \"${RELEASE_BRANCH}\" = \"stable\" ]; then\r\n    URL=\"https:\/\/api.vintagestory.at\/stable.json\"\r\nelif [ ${RELEASE_BRANCH} = \"unstable\" ]; then\r\n    URL=\"https:\/\/api.vintagestory.at\/unstable.json\"\r\nelif [ ${RELEASE_BRANCH} = \"pre\" ]; then\r\n    URL=\"https:\/\/api.vintagestory.at\/pre.json\"\r\nelse\r\n    echo -e \"Invalid release branch.\"\r\n    exit 1\r\nfi\r\n\r\n# Retrieve JSON data.\r\nJSON_DATA=$(curl -sS --cacert cacert.pem \"$URL\")\r\n\r\n# Validate JSON data.\r\necho -e $JSON_DATA | jq empty > \/dev\/null 2>&1\r\nif [ $? -ne 0 ]; then\r\n    echo -e \"Received invalid JSON data\"\r\n    exit 1\r\nfi\r\n\r\n# If the release version is set to \"latest,\" retrieve the latest version number.\r\nif [ \"${RELEASE_VERSION}\" = \"latest\" ]; then\r\n    LATEST_KEY=$(echo -e \"$JSON_DATA\" | jq -r 'to_entries[] | select(any(.value[]; .latest == 1)) | .key')\r\n    if [ -z \"$LATEST_KEY\" ]; then\r\n        echo -e \"Latest version not found\"\r\n        exit 1\r\n    else\r\n        RELEASE_VERSION=$LATEST_KEY\r\n    fi\r\nfi\r\n\r\n# Find the CDN and local URLs of the files to be downloaded.\r\nCDN_URL=$(echo -e \"$JSON_DATA\" | jq -r --arg VERSION \"$RELEASE_VERSION\" '.[$VERSION].server.urls.cdn')\r\nLOCAL_URL=$(echo -e \"$JSON_DATA\" | jq -r --arg VERSION \"$RELEASE_VERSION\" '.[$VERSION].server.urls.local')\r\n\r\n# Retrieve the MD5 hash.\r\nFILE_MD5=$(echo -e \"$JSON_DATA\" | jq -r --arg VERSION \"$RELEASE_VERSION\" '.[$VERSION].server.md5')\r\n\r\ncheck_http_status() {\r\n    local url=\"$1\"\r\n    local http_code=$(curl -sS --cacert cacert.pem -D - \"$url\" -o \/dev\/null | head -n 1 | awk '{print $2}')\r\n    echo -e \"$http_code\"\r\n}\r\n\r\n# Verify if the CDN file exists.\r\nHTTP_CODE=$(check_http_status \"$CDN_URL\")\r\n\r\n# If the CDN file does not exist, check the local file.\r\nif [ \"$HTTP_CODE\" != \"200\" ]; then\r\n    HTTP_CODE=$(check_http_status \"$LOCAL_URL\")\r\n    if [ \"$HTTP_CODE\" = \"200\" ]; then\r\n        FILE_URL=$LOCAL_URL\r\n    else\r\n        echo -e \"File not found\"\r\n        exit 1\r\n    fi\r\nelse\r\n    FILE_URL=$CDN_URL\r\nfi\r\n\r\nif [ ! -d \"data\" ]; then\r\n  mkdir data\r\nfi\r\n\r\n# Check if serverconfig.json exists in the data directory, if not, download it.\r\nif [ ! -f \"data\/serverconfig.json\" ]; then\r\n  curl -sS --cacert cacert.pem -o data\/serverconfig.json \"https:\/\/raw.githubusercontent.com\/NickHostingClub\/eggs\/main\/games\/VintageStory\/serverconfig.json\"\r\nfi\r\n\r\ncurl -sS --cacert cacert.pem \"$FILE_URL\" -o \"vs_server.tar.gz\"\r\n\r\n# Verify the MD5 hash of the downloaded file.\r\nDOWNLOADED_MD5=$(md5sum \"vs_server.tar.gz\" | awk '{print $1}')\r\n\r\nif [ \"$DOWNLOADED_MD5\" != \"$FILE_MD5\" ]; then\r\n    echo -e \"MD5 hash does not match, the file may be corrupted or compromised\"\r\n    rm \"vs_server.tar.gz\"\r\n    exit 1\r\nfi\r\n\r\ntar xz -f \"vs_server.tar.gz\"\r\n\r\n# Cleanup\r\nrm \"vs_server.tar.gz\"\r\nrm \"cacert.pem\"",
             "container": "pterodactyl-scripts:latest",
             "entrypoint": "ash"
         }
     },
     "variables": [
         {
-            "name": "Vintage Story Version",
-            "description": "Get the newest \"vs_server_*.*.*.tar.gz\" package (Tar.gz Archive\/Linux (server only) under Show other available downloads of Vintage Story)",
-            "env_variable": "VINTAGE_STORY_VERSION",
-            "default_value": "1.18.3",
+            "name": "Release Version",
+            "description": "Get the package version number. (Tar.gz Archive\/Linux (server only) under Show other available downloads of Vintage Story).",
+            "env_variable": "RELEASE_VERSION",
+            "default_value": "latest",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|regex:\/^[0-9]+(\\.[0-9]+){2}$\/",
+            "rules": "nullable|string|max:10",
+            "field_type": "text"
+        },
+        {
+            "name": "Release Branch",
+            "description": "Choose: stable, unstable or pre",
+            "env_variable": "RELEASE_BRANCH",
+            "default_value": "stable",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:8",
             "field_type": "text"
         }
     ]
